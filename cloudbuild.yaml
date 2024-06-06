@@ -1,0 +1,47 @@
+steps:
+  - name: gcr.io/cloud-builders/git
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        if [[ "$BRANCH_NAME" == "dev" ]]; then
+          git clone -b ${BRANCH_NAME} --single-branch https://kraftersdev:${_GIT_TOKEN_}@github.com/KatariMunicipality/${REPO_NAME}.git
+        elif [[ "$BRANCH_NAME" == "demo" ]]; then
+          git clone -b ${BRANCH_NAME} --single-branch https://kraftersdev:${_GIT_TOKEN_}@github.com/KatariMunicipality/${REPO_NAME}.git
+        else
+          git clone -b ${TAG_NAME} --single-branch https://kraftersdev:${_GIT_TOKEN_}@github.com/KatariMunicipality/${REPO_NAME}.git
+        fi
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        if [[ "$BRANCH_NAME" == "dev" ]]; then
+          docker build --build-arg  _ENV=${_ENV} --build-arg  PROJECT_ID=${PROJECT_ID} --build-arg  GITHUB_TOKEN=${_GIT_TOKEN_} -t  gcr.io/$PROJECT_ID/$(echo ${REPO_NAME} | sed 's/_//g'):${BRANCH_NAME} --file=Dockerfile .
+        elif [[ "$BRANCH_NAME" == "demo" ]]; then
+          docker build --build-arg  _ENV=${_ENV} --build-arg  PROJECT_ID=${PROJECT_ID} --build-arg  GITHUB_TOKEN=${_GIT_TOKEN_} -t  gcr.io/$PROJECT_ID/$(echo ${REPO_NAME} | sed 's/_//g'):${BRANCH_NAME} --file=Dockerfile .
+        else
+          docker build --build-arg  _ENV=${_ENV} --build-arg  PROJECT_ID=${PROJECT_ID} --build-arg  GITHUB_TOKEN=${_GIT_TOKEN_} -t  gcr.io/$PROJECT_ID/$(echo ${REPO_NAME} | sed 's/_//g'):${TAG_NAME} --file=Dockerfile .
+        fi
+  - name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        if [[ "$BRANCH_NAME" == "dev" ]]; then
+          docker push  gcr.io/$PROJECT_ID/$(echo ${REPO_NAME} | sed 's/_//g'):${BRANCH_NAME}
+        elif [[ "$BRANCH_NAME" == "demo" ]]; then
+          docker push  gcr.io/$PROJECT_ID/$(echo ${REPO_NAME} | sed 's/_//g'):${BRANCH_NAME}
+        else
+          docker push  gcr.io/$PROJECT_ID/$(echo ${REPO_NAME} | sed 's/_//g'):${TAG_NAME}
+        fi
+  - name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        echo "Running dev-specific commands"
+        echo "$_SSH_KEY_SECRET" > ssh_key.pem
+        chmod 600 ssh_key.pem
+        ssh -o StrictHostKeyChecking=no -i ssh_key.pem $_SSH_USER@$_INSTANCE_IP -p $_PORT "${_DIR} && ${_COMMAND}"
+        echo "sucessfully deployed "
